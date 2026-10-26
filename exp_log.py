@@ -1,9 +1,9 @@
 # exp_log.py - the experiment ledger: one change per row, measured on the SEALED holdout, keep/kill with the evidence.
-#   python exp_log.py init "<Ch>" --metric auc --direction max
-#   python exp_log.py add  "<Ch>" --id E3 --parent E1 --change "mixup a=0.4" --holdout 0.7312 [--t 1.4] [--verdict keep]
+#   python exp_log.py init "<project>" --metric auc --direction max
+#   python exp_log.py add  "<project>" --id E3 --parent E1 --change "mixup a=0.4" --holdout 0.7312 [--t 1.4] [--verdict keep]
 #                          [--kill "FT=y SCHED=y HEADLR=y LEN=y CARD=y"] [--cost "18m 3090"] [--note "..."]
-#   python exp_log.py show "<Ch>"     table with delta vs parent, KEEP chain, and levers killed without the G-KILL five
-#   python exp_log.py best "<Ch>"     best KEPT row (the one the next experiment must be paired against)
+#   python exp_log.py show "<project>"     table with delta vs parent, the KEEP chain, and changes killed without the five checks
+#   python exp_log.py best "<project>"     best KEPT row (the one the next experiment must be paired against)
 import argparse, csv, datetime, os, re, sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -14,13 +14,13 @@ FIVE = ["FT", "SCHED", "HEADLR", "LEN", "CARD"]
 def path(ch):
     d = ch if os.path.isdir(ch) else os.path.join(ROOT, ch)
     if not os.path.isdir(d):
-        sys.exit(f"no challenge dir '{d}'")
+        sys.exit(f"no project dir '{d}'")
     return os.path.join(d, "experiments.tsv")
 
 
 def read(p):
     if not os.path.exists(p):
-        sys.exit(f"{p} missing - run: exp_log.py init \"<Ch>\" --metric <m> --direction max|min")
+        sys.exit(f"{p} missing - run: exp_log.py init \"<project>\" --metric <m> --direction max|min")
     with open(p, encoding="utf-8") as f:
         head = f.readline().strip()
         m = re.match(r"# metric=(\S+) direction=(max|min)", head)
@@ -56,21 +56,21 @@ byid = {r["id"]: r for r in rows}
 
 if a.cmd == "add":
     if not a.id or a.holdout is None or not a.change:
-        sys.exit("add needs --id, --change and --holdout (a measured sealed-holdout number, G-DRAW)")
+        sys.exit("add needs --id, --change and --holdout (a measured held-out score)")
     if a.id in byid:
         sys.exit(f"id {a.id} already logged")
     if a.parent and a.parent not in byid:
         sys.exit(f"parent {a.parent} not in ledger")
     if len(re.split(r";|\s\+\s|, and ", a.change)) > 1:
         print("WARNING: this row changes more than one thing - you will not know which part moved the score. "
-              "Split it unless it is a deliberate combined test (G-COMBINE).")
+              "Split it unless it is a deliberate combined test.")
     v = (a.verdict or "pending").lower()
     if v == "kill":
         flags = dict(re.findall(r"(\w+)=([yn])", a.kill or ""))
         miss = [k for k in FIVE if flags.get(k) != "y"]
         if miss:
-            print(f"G-KILL: {', '.join(miss)} not 'y' -> logged as UNTESTED, not killed. A lever is dead only when tested "
-                  f"fine-tuned, at the shipped schedule, head-LR swept, full input length, sized for the 24 GB grader.")
+            print(f"kill check: {', '.join(miss)} not 'y' -> logged as UNTESTED, not killed. A lever is dead only when tested "
+                  f"fine-tuned, at the shipped schedule, head-LR swept, full input length, on the target hardware.")
             v = "untested"
     row = {c: (getattr(a, c) or "") for c in COLS[:-1]}
     row.update(verdict=v, when=datetime.datetime.now().strftime("%m-%d %H:%M"))
@@ -82,7 +82,6 @@ if a.cmd == "add":
         print(f"{a.id}: {a.holdout} vs {a.parent} {par['holdout']} -> {'+' if d >= 0 else ''}{d:.5f} favourable | {v}")
         if v == "keep" and not a.t:
             print("  no paired t logged - run paired_delta.py against the parent's stored holdout predictions before KEEP")
-    print("  if this surprised you, log it: python learn.py log \"<Ch>\" lever \"...\"")
     sys.exit(0)
 
 if a.cmd == "best":

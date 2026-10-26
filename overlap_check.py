@@ -1,6 +1,6 @@
 # overlap_check.py - detect stride-k overlapping windows in a (rows, T, C) sequence dataset BEFORE any within-block CV split.
-# Bought 2026-09-27 (GOES X-ray Regime Trajectory Forecasting): validation anchors sat 2 bins apart, a random 2-fold inside
-# the block leaked neighbours, and a val-weighting "gain" of +0.007 was really -0.003 (graded 0.6066 vs leaky 0.6210).
+# When rows are sliding windows over one long series, neighbouring rows share most of their values, so a random-row
+# split puts near-copies on both sides and validation scores look better than they are.
 # usage: python overlap_check.py data.npz [--key X] [--rows 1500] [--maxshift 12]
 #        or a csv with a ';'-separated sequence column: python overlap_check.py train.csv --col sequence --T 36 --C 2
 # exit 1 = OVERLAP FOUND (use segment/group folds, never random rows) | 0 = no overlap detected

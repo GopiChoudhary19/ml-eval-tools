@@ -1,7 +1,7 @@
 # ml-eval-tools
 
 Small command-line utilities for deciding whether an ML change is a real improvement or just noise.
-Requires Python 3, numpy, pandas and scikit-learn.
+Requires Python 3, numpy, pandas and scikit-learn (`pip install -r requirements.txt`).
 
 | Script | What it does |
 |---|---|
@@ -16,7 +16,7 @@ Requires Python 3, numpy, pandas and scikit-learn.
 
 ```bash
 # is B better than A on the same rows?
-python paired_delta.py cand.csv banked.csv --truth truth.csv --target y --metric auc
+python paired_delta.py cand.csv baseline.csv --truth truth.csv --target y --metric auc
 
 # is a blend worth shipping?
 python oof_blend.py --truth truth.csv --target y --metric auc --preds a.csv b.csv c.csv
@@ -28,6 +28,15 @@ python exp_log.py add MyTask --id E1 --change "baseline" --holdout 0.731 --verdi
 # reseed or real change?
 python draw_check.py new_solution.py old_solution.py --csv new.csv old.csv --pub 0.73 0.74 0.72
 ```
+
+## Tests
+
+```bash
+pytest -q
+```
+
+Each tool is tested end to end on small synthetic data (a known improvement, a reseed vs a real change,
+sliding windows vs independent rows, a ledger round trip); CI runs them on every push.
 
 ## License
 
