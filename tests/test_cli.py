@@ -66,3 +66,31 @@ def test_exp_log_roundtrip(tmp_path):
             "--verdict", "keep", "--t", "2.1")
     assert "+0.02000" in r.stdout
     assert "best KEEP: E2" in run("exp_log.py", "best", proj).stdout
+
+
+def test_draw_check_keeps_hash_inside_strings(tmp_path):
+    (tmp_path / "a.py").write_text('SEED = 1\ntag = "#v1"  # run tag\n')
+    (tmp_path / "b.py").write_text('SEED = 2\ntag = "#v2"  # run tag\n')
+    r = run("draw_check.py", tmp_path / "b.py", tmp_path / "a.py")
+    assert "SEED-ONLY" not in r.stdout
+
+
+def test_draw_check_does_not_treat_a_hyperparameter_grid_as_seeds(tmp_path):
+    (tmp_path / "a.py").write_text("for depth in (4, 6, 8):\n    fit(depth)\n")
+    (tmp_path / "b.py").write_text("for depth in (4, 6, 10):\n    fit(depth)\n")
+    r = run("draw_check.py", tmp_path / "b.py", tmp_path / "a.py")
+    assert "SEED-ONLY" not in r.stdout and "HYPERPARAM-ONLY" in r.stdout
+
+
+def test_draw_check_still_normalises_seed_loops(tmp_path):
+    (tmp_path / "a.py").write_text("for seed in (0, 1, 2):\n    fit(seed)\n")
+    (tmp_path / "b.py").write_text("for seed in (3, 4, 5):\n    fit(seed)\n")
+    assert "SEED-ONLY" in run("draw_check.py", tmp_path / "b.py", tmp_path / "a.py").stdout
+
+
+def test_oof_blend_rejects_rank_averaging_for_probability_metrics(tmp_path):
+    pd.DataFrame({"id": range(10), "y": [0, 1] * 5}).to_csv(tmp_path / "truth.csv", index=False)
+    pd.DataFrame({"id": range(10), "p": np.linspace(0.1, 0.9, 10)}).to_csv(tmp_path / "a.csv", index=False)
+    r = run("oof_blend.py", "--truth", tmp_path / "truth.csv", "--target", "y", "--metric", "logloss",
+            "--preds", tmp_path / "a.csv", tmp_path / "a.csv", "--rank")
+    assert r.returncode != 0 and "--rank only makes sense" in r.stderr

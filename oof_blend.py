@@ -16,6 +16,9 @@ ap.add_argument("--rank", action="store_true", help="rank-average scalar predict
 ap.add_argument("--seed", type=int, default=0)
 a = ap.parse_args()
 m = C.canon(a.metric); sgn = 1 if C.DIRECTION[m] == "max" else -1
+if a.rank and m not in ("auc", "ap"):
+    # ranks are not probabilities, so blending them would make logloss/brier/accuracy numbers meaningless
+    sys.exit(f"--rank only makes sense for ranking metrics (auc, ap), not {m}")
 tr = C.load_truth(a.truth, a.id, a.target); ids = tr[a.id].tolist(); y = tr["__y"].to_numpy()
 P, cls = [], None
 for f in a.preds:
