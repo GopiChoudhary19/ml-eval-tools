@@ -94,3 +94,16 @@ def test_oof_blend_rejects_rank_averaging_for_probability_metrics(tmp_path):
     r = run("oof_blend.py", "--truth", tmp_path / "truth.csv", "--target", "y", "--metric", "logloss",
             "--preds", tmp_path / "a.csv", tmp_path / "a.csv", "--rank")
     assert r.returncode != 0 and "--rank only makes sense" in r.stderr
+
+
+def test_paired_delta_refuses_duplicate_ids(tmp_path):
+    pd.DataFrame({"id": [1, 2, 2], "score": [0.1, 0.2, 0.3]}).to_csv(tmp_path / "base.csv", index=False)
+    pd.DataFrame({"id": [1, 2, 3], "score": [0.2, 0.3, 0.4]}).to_csv(tmp_path / "cand.csv", index=False)
+    r = run("paired_delta.py", tmp_path / "cand.csv", tmp_path / "base.csv", "--col", "score")
+    assert r.returncode != 0 and "duplicate ids" in (r.stdout + r.stderr)
+
+    pd.DataFrame({"id": [1, 2, 3], "y": [0, 1, 0]}).to_csv(tmp_path / "truth.csv", index=False)
+    pd.DataFrame({"id": [1, 2, 2, 3], "p": [0.1, 0.9, 0.8, 0.2]}).to_csv(tmp_path / "dup.csv", index=False)
+    r = run("paired_delta.py", tmp_path / "dup.csv", tmp_path / "cand.csv",
+            "--truth", tmp_path / "truth.csv", "--target", "y", "--metric", "auc")
+    assert r.returncode != 0 and "duplicate ids" in (r.stdout + r.stderr)

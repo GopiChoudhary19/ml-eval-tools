@@ -21,6 +21,10 @@ rng = np.random.default_rng(a.seed)
 
 if a.col:
     A = pd.read_csv(a.baseline).set_index(a.id)[a.col]; B = pd.read_csv(a.cand).set_index(a.id)[a.col]
+    for name, s in (("baseline", A), ("cand", B)):
+        # a repeated id makes .loc return extra rows and silently pairs the wrong rows
+        if s.index.has_duplicates:
+            sys.exit(f"{name}: duplicate ids (e.g. {list(s.index[s.index.duplicated()][:3])}) - pairing would be wrong")
     common = A.index.intersection(B.index)
     if len(common) < max(len(A), len(B)):
         print(f"WARNING: only {len(common)} shared ids (baseline {len(A)}, cand {len(B)}) - holdout rows differ, pairing is "

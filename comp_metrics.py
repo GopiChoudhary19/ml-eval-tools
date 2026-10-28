@@ -26,6 +26,8 @@ def load_truth(path, idcol, target):
     t = pd.read_csv(path, keep_default_na=False)
     if target not in t.columns:
         sys.exit(f"{path}: no column '{target}' (have {list(t.columns)[:12]})")
+    if t[idcol].duplicated().any():
+        sys.exit(f"{path}: duplicate ids in the truth file - every row must be scored once")
     return t[[idcol, target]].rename(columns={target: "__y"})
 
 
@@ -33,6 +35,8 @@ def load_pred(path, idcol, truth_ids, target=None):
     p = pd.read_csv(path)
     if idcol not in p.columns:
         sys.exit(f"{path}: no id column '{idcol}'")
+    if p[idcol].duplicated().any():
+        sys.exit(f"{path}: duplicate ids (e.g. {p.loc[p[idcol].duplicated(), idcol].head(3).tolist()}) - pairing would be wrong")
     p = p.set_index(idcol)
     missing = set(truth_ids) - set(p.index)
     if missing:
