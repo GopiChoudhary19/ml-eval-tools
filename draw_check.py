@@ -16,15 +16,18 @@ not improvement). --pub takes visible scores of several draws of one recipe and 
 selection inflation, max - mean.
 """
 import re
+import io
 import sys
 import difflib
 import statistics
+import tokenize
 
 SEED_CONTEXTS = [
     r'(?:^|\W)(?:SEED|seed|random_state|bagging_seed|feature_fraction_seed)\s*=\s*-?\d+',
     r'(?:manual_seed|default_rng|np\.random\.seed|seed_everything|set_seed)\s*\(\s*-?\d+',
-    r'for\s+\w+\s+in\s*\(\s*-?\d+(?:\s*,\s*-?\d+)*\s*,?\s*\)',
-    r'for\s+\w+\s+in\s*\[\s*-?\d+(?:\s*,\s*-?\d+)*\s*,?\s*\]',
+    # only loops whose variable is a seed; `for depth in (4, 6, 8)` is a hyperparameter grid, not a reseed
+    r'for\s+\w*seed\w*\s+in\s*\(\s*-?\d+(?:\s*,\s*-?\d+)*\s*,?\s*\)',
+    r'for\s+\w*seed\w*\s+in\s*\[\s*-?\d+(?:\s*,\s*-?\d+)*\s*,?\s*\]',
 ]
 NUM = re.compile(r'-?\d+\.?\d*(?:[eE][-+]?\d+)?')
 # a changed line that only re-rolls randomisation: seeds, folds, shuffles, permutations
@@ -33,10 +36,26 @@ RANDOMISATION = re.compile(
     r'train_test_split|bootstrap|bagging)\b', re.I)
 
 
+def strip_comments(source):
+    """Drop real comments only; a '#' inside a string ("#v2", "#fff", a URL anchor) is code."""
+    lines = source.splitlines()
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except (tokenize.TokenError, SyntaxError):
+        return [l.split('#')[0] for l in lines]
+    for tok in reversed(tokens):
+        if tok.type == tokenize.COMMENT:
+            row, col = tok.start
+            lines[row - 1] = lines[row - 1][:col]
+    return lines
+
+
 def normalize(path):
     out = []
-    for line in open(path, encoding='utf-8'):
-        line = line.split('#')[0].rstrip()
+    with open(path, encoding='utf-8') as f:
+        source = f.read()
+    for line in strip_comments(source):
+        line = line.rstrip()
         if not line.strip():
             continue
         for pat in SEED_CONTEXTS:
